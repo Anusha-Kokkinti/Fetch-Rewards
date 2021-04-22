@@ -1,0 +1,158 @@
+What are the top 5 brands by receipts scanned for most recent month?
+
+Description:  Executed the queries using joins, rank function and subqueries
+
+--first created the innermost query to get the list of barcodes present in the receipts that are scanned within a month by joining PurchaseItem table and Receipt table
+-- Now I got the barcodes, then grouped the quanitity purchased by using aggregation 
+-- got the list of barcodes with their sum, joined it with brand table to get the brands and grouped the items belonging to brand and applied the filter of topbrand= yes
+-- used dense rank function to get the ranking of the brand name (brands with more items purchased will be listed first)
+-- Used between operator to get the top five brands 
+
+
+*************************************************************************************************************************************************
+	
+Select * from
+(	
+	select c.name, dense_rank() over (order by c.total desc)ranking from  
+		(
+			select name, sum(a.subTotalitem) as total from brand b join 
+			
+				 
+					(
+							select barcode, sum(quanitypurchased) as subTotalitem  from purchaseitems p join receipt r on p.receipt_ID= r.receipt_ID 
+							where extract(day from(now()-r.datescanned))<=30
+							group by barcode
+							
+					)a	
+
+			on b.barcode = a.barcode 
+			where Topbrand =1 
+			group by name 
+		)c
+)x where x.ranking between 1 and 5
+
+______________________________________________________________________________________________________________________________________________________________________________
+How does the ranking of the top 5 brands by receipts scanned for the recent month compare to the ranking for the previous month
+
+
+Description: Performed the same query given above but with different date frame and joined the queries to get their ranking comparisons
+
+
+
+***********************************************************************************************************************************************
+select y.name,y.ranking_current_month,z.ranking_previous_month from 
+
+(
+	select name, total, dense_rank() over (order by total desc)ranking_current_month from  
+		(
+			select name, sum(a.subTotalitem) as total from brand b join 
+			
+				 
+					(
+							select barcode, sum(quanitypurchased) as subTotalitem  from purchaseitems p join receipt r on p.receipt_ID= r.receipt_ID 
+							where extract(day from(now()-r.datescanned))<=30
+							group by barcode
+							
+					)a	
+
+			on b.barcode = a.barcode 
+			where Topbrand =1 
+			group by name 
+		)
+)y		
+
+join
+
+(
+	select name, total, dense_rank() over (order by total desc)ranking_previous_month from  
+		(
+			select name, sum(a.subTotalitem) as total from brand b join 
+			
+				 
+					(
+							select barcode, sum(quanitypurchased) as subTotalitem  from purchaseitems p join receipt r on p.receipt_ID= r.receipt_ID 
+							where extract(day from(now()-datescanned))>30 and extract(day from(now()-datescanned))<=60
+							group by barcode
+							
+					)a	
+
+			on b.barcode = a.barcode 
+			where Topbrand =1 
+			group by name 
+		)
+
+ )z 
+
+on y.name = z.name 
+_____________________________________________________________________________________________________________________________________________________________________________
+
+When considering average spend from receipts with 'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+
+Description :need data from Receipt table using columns Total Spent, rewards receipt status
+******************************************************************************************************
+Query:
+select rewardsReceiptStatus, AVG(TotalSpent) as greater_revenue
+from Receipt
+GROUP by rewardsReceiptStatus
+order by AVG(TotalSpent) desc 
+limit 1
+__________________________________________________________________________________________________________________________________________________________________________
+
+When considering total number of items purchased from receipts with 'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+
+Description: Need data from receipt table using columns purchasedItemCount, rewardsReceiptStatus
+****************************************************************************************
+Query:
+select rewardsReceiptStatus, SUM(purchasedItemCount) as greater_revenue
+from Receipt
+GROUP by rewardsReceiptStatus
+order by SUM(purchasedItemCount) desc 
+limit 1
+_________________________________________________________________________________________________________________________________________________________________________
+Which brand has the most spend among users who were created within the past 6 months?
+
+Description: 
+-- first created the innermost query by combining receipt table and users table to get the user list that had made some transaction and created within six months
+-- Joined the receipt table and purchaseitem list table to get the barcode associated with receipt and grouped them to get the sum of items purchased
+-- Joined the Purchase items table and brand table to group the items belonging to brand
+-- ordering the brand with highest sum of items gives the required output
+*********************************************************************************************************************
+Select d.name, sum(b.spend)  from brand d 
+join 
+     (
+            select barcode, sum(itemprice*quanitypurchased) as spend from purchaseitems i 
+						  join 
+						  (
+                        select userID, receipt ID from receipt r 
+						            join  users u 
+												on r.userID= u.userID where extract(month from(now()-u.createdDate))<=6 
+               )a 
+						   on i.receipt_ID =a.receipt_ID group by barcode
+      )b
+on d.barcode = b.barcode 
+group by d.name
+order by sum(b.spend) desc limit 1
+_______________________________________________________________________________________________________________________________________________________________________
+Which brand has the most transactions among users who were created within the past 6 months?
+
+Description: Same as above query but based on countquantity
+
+
+*****************************************************************************************************************************************************************
+Select d.name, sum(b.countquantity)  from brand d 
+join 
+    (
+               select barcode, sum(quanitypurchased) as countquantity from purchaseitems i 
+						   join 
+						  (
+                  select userID, receipt ID from receipt r 
+						                      join  
+																	users u 
+																	on r.userID= u.userID where extract(month from(now()-u.createdDate))<=6 
+              )a 
+						   on i.receipt_ID =a.receipt_ID group by barcode
+     )b
+on d.barcode = b.barcode 
+group by d.name
+order by sum(b.countquantity) desc limit 1
+___________________________________________________________________________________________________________________________________________________________________
